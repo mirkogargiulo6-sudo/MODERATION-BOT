@@ -200,19 +200,22 @@ client.on('messageCreate', async (message) => {
         if (!target) return sendErrorEmbed(`Uso corretto: \`${config.prefix}kick @utente [motivo]\``);
         const reason = args.slice(1).join(" ") || "Nessun motivo specificato";
         
-        await target.kick(reason);
-
-        const kickEmbed = new EmbedBuilder()
-            .setColor('#E67E22')
-            .setTitle('🚫 Utente Espulso')
-            .addFields(
-                { name: 'Utente', value: `${target.user.tag}`, inline: true },
-                { name: 'Moderatore', value: `${message.author.tag}`, inline: true },
-                { name: 'Motivo', value: reason }
-            )
-            .setTimestamp();
-
-        message.channel.send({ embeds: [kickEmbed] });
+        try {
+            await target.kick(reason);
+            const kickEmbed = new EmbedBuilder()
+                .setColor('#E67E22')
+                .setTitle('🚫 Utente Espulso')
+                .addFields(
+                    { name: 'Utente', value: `${target.user.tag}`, inline: true },
+                    { name: 'Moderatore', value: `${message.author.tag}`, inline: true },
+                    { name: 'Motivo', value: reason }
+                )
+                .setTimestamp();
+            message.channel.send({ embeds: [kickEmbed] });
+        } catch (err) {
+            console.error(err);
+            sendErrorEmbed("Non ho i permessi per espellere questo utente. Verifica la gerarchia dei ruoli.");
+        }
     }
 
     // --- COMANDO !ban @utente [motivo] ---
@@ -222,41 +225,50 @@ client.on('messageCreate', async (message) => {
         if (!target) return sendErrorEmbed(`Uso corretto: \`${config.prefix}ban @utente [motivo]\``);
         const reason = args.slice(1).join(" ") || "Nessun motivo specificato";
         
-        await target.ban({ reason });
-
-        const banEmbed = new EmbedBuilder()
-            .setColor('#992D22')
-            .setTitle('❌ Utente Bannato')
-            .addFields(
-                { name: 'Utente', value: `${target.user.tag}`, inline: true },
-                { name: 'Moderatore', value: `${message.author.tag}`, inline: true },
-                { name: 'Motivo', value: reason }
-            )
-            .setTimestamp();
-
-        message.channel.send({ embeds: [banEmbed] });
+        try {
+            await target.ban({ reason });
+            const banEmbed = new EmbedBuilder()
+                .setColor('#992D22')
+                .setTitle('❌ Utente Bannato')
+                .addFields(
+                    { name: 'Utente', value: `${target.user.tag}`, inline: true },
+                    { name: 'Moderatore', value: `${message.author.tag}`, inline: true },
+                    { name: 'Motivo', value: reason }
+                )
+                .setTimestamp();
+            message.channel.send({ embeds: [banEmbed] });
+        } catch (err) {
+            console.error(err);
+            sendErrorEmbed("Non ho i permessi per bannare questo utente. Verifica la gerarchia dei ruoli.");
+        }
     }
 
     // --- COMANDO !mute @utente [minuti] ---
     if (command === 'mute') {
         if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return sendErrorEmbed("Non hai i permessi per isolare utenti.");
         const target = message.mentions.members.first();
-        const duration = parseInt(args[1]);
+        
+        // CORREZIONE BUG DI ESTRAZIONE NUMERICA ARGS:
+        const duration = parseInt(args[1]); 
+        
         if (!target || isNaN(duration)) return sendErrorEmbed(`Uso corretto: \`${config.prefix}mute @utente [minuti]\``);
         
-        await target.timeout(duration * 60 * 1000);
-
-        const muteEmbed = new EmbedBuilder()
-            .setColor('#95A5A6')
-            .setTitle('🤐 Utente In Muto')
-            .addFields(
-                { name: 'Utente', value: `${target.user.tag}`, inline: true },
-                { name: 'Durata', value: `${duration} minuti`, inline: true },
-                { name: 'Moderatore', value: `${message.author.tag}` }
-            )
-            .setTimestamp();
-
-        message.channel.send({ embeds: [muteEmbed] });
+        try {
+            await target.timeout(duration * 60 * 1000);
+            const muteEmbed = new EmbedBuilder()
+                .setColor('#95A5A6')
+                .setTitle('🤐 Utente In Muto')
+                .addFields(
+                    { name: 'Utente', value: `${target.user.tag}`, inline: true },
+                    { name: 'Durata', value: `${duration} minuti`, inline: true },
+                    { name: 'Moderatore', value: `${message.author.tag}` }
+                )
+                .setTimestamp();
+            message.channel.send({ embeds: [muteEmbed] });
+        } catch (err) {
+            console.error(err);
+            sendErrorEmbed("Impossibile mutare l'utente. Assicurati che il mio ruolo sia posizionato SOPRA quello dell'utente e che non sia un amministratore.");
+        }
     }
 
     // --- COMANDO !unmute @utente ---
@@ -265,13 +277,16 @@ client.on('messageCreate', async (message) => {
         const target = message.mentions.members.first();
         if (!target) return sendErrorEmbed(`Uso corretto: \`${config.prefix}unmute @utente\``);
         
-        await target.timeout(null);
-
-        const unmuteEmbed = new EmbedBuilder()
-            .setColor('#3498DB')
-            .setDescription(`🔊 Il muto a **${target.user.tag}** è stato rimosso con successo.`);
-
-        message.channel.send({ embeds: [unmuteEmbed] });
+        try {
+            await target.timeout(null);
+            const unmuteEmbed = new EmbedBuilder()
+                .setColor('#3498DB')
+                .setDescription(`🔊 Il muto a **${target.user.tag}** è stato rimosso con successo.`);
+            message.channel.send({ embeds: [unmuteEmbed] });
+        } catch (err) {
+            console.error(err);
+            sendErrorEmbed("Impossibile rimuovere il muto. Controlla i permessi della gerarchia.");
+        }
     }
 
     // --- COMANDO !clear [1-100] ---
