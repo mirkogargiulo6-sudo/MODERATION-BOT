@@ -1,10 +1,35 @@
 const { Client, GatewayIntentBits, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const config = require('./config.json');
 const http = require('http');
-const Enmap = require('enmap');
+const fs = require('fs');
 
-// --- DATABASE LOCALE PER I WARN ---
-const db = new Enmap({ name: "warns" });
+// --- DATABASE LOCALE SU FILE JSON PER I WARN ---
+const WARNS_FILE = './warns.json';
+if (!fs.existsSync(WARNS_FILE)) {
+    fs.writeFileSync(WARNS_FILE, JSON.stringify({}));
+}
+
+function getWarns(userId) {
+    const data = JSON.parse(fs.readFileSync(WARNS_FILE, 'utf8'));
+    return data[userId] || [];
+}
+
+function saveWarn(userId, warnData) {
+    const data = JSON.parse(fs.readFileSync(WARNS_FILE, 'utf8'));
+    if (!data[userId]) data[userId] = [];
+    data[userId].push(warnData);
+    fs.writeFileSync(WARNS_FILE, JSON.stringify(data, null, 2));
+}
+
+function removeLastWarn(userId) {
+    const data = JSON.parse(fs.readFileSync(WARNS_FILE, 'utf8'));
+    if (data[userId] && data[userId].length > 0) {
+        data[userId].pop();
+        fs.writeFileSync(WARNS_FILE, JSON.stringify(data, null, 2));
+        return data[userId].length;
+    }
+    return 0;
+}
 
 // --- MINI SERVER WEB PER EVITARE L'ERRORE DI RENDER ---
 const port = process.env.PORT || 3000;
@@ -109,10 +134,9 @@ client.on('messageCreate', async (message) => {
         if (!target) return sendErrorEmbed(`Uso corretto: \`${config.prefix}warn @utente [motivo]\``);
         const reason = args.join(" ") || "Nessun motivo specificato";
 
-        db.ensure(target.id, []);
-        db.push(target.id, { moderator: message.author.tag, reason: reason, date: new Date().toLocaleDateString() });
-
-        const count = db.get(target.id).length;
+        const warnData = { moderator: message.author.tag, reason: reason, date: new Date().toLocaleDateString() };
+        saveWarn(target.id, warnData);
+        const count = getWarns(target.id).length;
 
         const warnEmbed = new EmbedBuilder()
             .setColor('#F1C40F')
@@ -131,8 +155,7 @@ client.on('messageCreate', async (message) => {
     // --- COMANDO !warns @utente ---
     if (command === 'warns') {
         const target = message.mentions.members.first() || message.member;
-        db.ensure(target.id, []);
-        const userWarns = db.get(target.id);
+        const userWarns = getWarns(target.id);
 
         if (userWarns.length === 0) {
             const noWarnsEmbed = new EmbedBuilder().setColor('#2ECC71').setDescription(`😇 **${target.user.tag}** non ha nessun ammonimento sul server.`);
@@ -159,17 +182,14 @@ client.on('messageCreate', async (message) => {
         const target = message.mentions.members.first();
         if (!target) return sendErrorEmbed(`Uso corretto: \`${config.prefix}unwarn @utente\``);
 
-        db.ensure(target.id, []);
-        const userWarns = db.get(target.id);
-
+        const userWarns = getWarns(target.id);
         if (userWarns.length === 0) return sendErrorEmbed("Questo utente non possiede alcun warn da rimuovere.");
 
-        userWarns.pop();
-        db.set(target.id, userWarns);
+        const remaining = removeLastWarn(target.id);
 
         const unwarnEmbed = new EmbedBuilder()
             .setColor('#2ECC71')
-            .setDescription(`✅ Rimosso con successo l'ultimo warn a **${target.user.tag}**. Warn rimanenti: \`${userWarns.length}\`.`);
+            .setDescription(`✅ Rimosso con successo l'ultimo warn a **${target.user.tag}**. Warn rimanenti: \`${remaining}\`.`);
         
         message.channel.send({ embeds: [unwarnEmbed] });
     }
@@ -213,7 +233,6 @@ client.on('messageCreate', async (message) => {
                 .setTimestamp();
             message.channel.send({ embeds: [kickEmbed] });
         } catch (err) {
-            console.error(err);
             sendErrorEmbed("Non ho i permessi per espellere questo utente. Verifica la gerarchia dei ruoli.");
         }
     }
@@ -238,7 +257,6 @@ client.on('messageCreate', async (message) => {
                 .setTimestamp();
             message.channel.send({ embeds: [banEmbed] });
         } catch (err) {
-            console.error(err);
             sendErrorEmbed("Non ho i permessi per bannare questo utente. Verifica la gerarchia dei ruoli.");
         }
     }
@@ -247,9 +265,7 @@ client.on('messageCreate', async (message) => {
     if (command === 'mute') {
         if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return sendErrorEmbed("Non hai i permessi per isolare utenti.");
         const target = message.mentions.members.first();
-        
-        // CORREZIONE BUG DI ESTRAZIONE NUMERICA ARGS:
-        const duration = parseInt(args[1]); 
+        const duration = parseInt(args[0]); 
         
         if (!target || isNaN(duration)) return sendErrorEmbed(`Uso corretto: \`${config.prefix}mute @utente [minuti]\``);
         
@@ -266,8 +282,7 @@ client.on('messageCreate', async (message) => {
                 .setTimestamp();
             message.channel.send({ embeds: [muteEmbed] });
         } catch (err) {
-            console.error(err);
-            sendErrorEmbed("Impossibile mutare l'utente. Assicurati che il mio ruolo sia posizionato SOPRA quello dell'utente e che non sia un amministratore.");
+            sendErrorEmbed("Impossibile mutare l'utente. Assicurati che il mio ruolo sia posizionato SOPRA quello dell'utente.");
         }
     }
 
@@ -284,7 +299,6 @@ client.on('messageCreate', async (message) => {
                 .setDescription(`🔊 Il muto a **${target.user.tag}** è stato rimosso con successo.`);
             message.channel.send({ embeds: [unmuteEmbed] });
         } catch (err) {
-            console.error(err);
             sendErrorEmbed("Impossibile rimuovere il muto. Controlla i permessi della gerarchia.");
         }
     }
