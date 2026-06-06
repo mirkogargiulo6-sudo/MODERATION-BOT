@@ -1,6 +1,10 @@
 const { Client, GatewayIntentBits, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const config = require('./config.json');
 const http = require('http');
+const Enmap = require('enmap');
+
+// --- DATABASE LOCALE PER I WARN ---
+const db = new Enmap({ name: "warns" });
 
 // --- MINI SERVER WEB PER EVITARE L'ERRORE DI RENDER ---
 const port = process.env.PORT || 3000;
@@ -78,8 +82,12 @@ client.on('messageCreate', async (message) => {
                 { name: '🛡️ Moderazione (Solo Staff)', value: 
                   `\`${config.prefix}kick @utente [motivo]\` - Espelle un membro dal server.\n` +
                   `\`${config.prefix}ban @utente [motivo]\` - Banna permanentemente un membro.\n` +
+                  `\`${config.prefix}unban ID_UTENTE\` - Sblocca un utente precedentemente bannato.\n` +
                   `\`${config.prefix}mute @utente [minuti]\` - Isola temporalmente un utente.\n` +
                   `\`${config.prefix}unmute @utente\` - Rimuove l'isolamento a un utente.\n` +
+                  `\`${config.prefix}warn @utente [motivo]\` - Ammonisce ufficialmente un utente.\n` +
+                  `\`${config.prefix}unwarn @utente\` - Rimuove l'ultimo ammonimento ricevuto.\n` +
+                  `\`${config.prefix}warns @utente\` - Mostra lo storico degli ammonimenti di un utente.\n` +
                   `\`${config.prefix}clear [1-100]\` - Cancella un numero specifico di messaggi.` 
                 },
                 { name: '⚙️ Automazione', value: 
@@ -94,13 +102,103 @@ client.on('messageCreate', async (message) => {
 
         return message.channel.send({ embeds: [helpEmbed] });
     }
+    // --- COMANDO !warn @utente [motivo] ---
+    if (command === 'warn') {
+        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return sendErrorEmbed("Non hai i permessi per ammonire gli utenti.");
+        const target = message.mentions.members.first();
+        if (!target) return sendErrorEmbed(`Uso corretto: \`${config.prefix}warn @utente [motivo]\``);
+        const reason = args.join(" ") || "Nessun motivo specificato";
+
+        db.ensure(target.id, []);
+        db.push(target.id, { moderator: message.author.tag, reason: reason, date: new Date().toLocaleDateString() });
+
+        const count = db.get(target.id).length;
+
+        const warnEmbed = new EmbedBuilder()
+            .setColor('#F1C40F')
+            .setTitle('⚠️ Utente Ammonito (Warn)')
+            .addFields(
+                { name: 'Utente', value: `${target.user.tag}`, inline: true },
+                { name: 'Moderatore', value: `${message.author.tag}`, inline: true },
+                { name: 'Totale Warn attuali', value: `\`${count}\``, inline: true },
+                { name: 'Motivo', value: reason }
+            )
+            .setTimestamp();
+
+        message.channel.send({ embeds: [warnEmbed] });
+    }
+
+    // --- COMANDO !warns @utente ---
+    if (command === 'warns') {
+        const target = message.mentions.members.first() || message.member;
+        db.ensure(target.id, []);
+        const userWarns = db.get(target.id);
+
+        if (userWarns.length === 0) {
+            const noWarnsEmbed = new EmbedBuilder().setColor('#2ECC71').setDescription(`😇 **${target.user.tag}** non ha nessun ammonimento sul server.`);
+            return message.channel.send({ embeds: [noWarnsEmbed] });
+        }
+
+        let list = "";
+        userWarns.forEach((w, i) => {
+            list += `**${i + 1}.** Data: ${w.date} | Mod: ${w.moderator}\n➔ Motivo: *${w.reason}*\n\n`;
+        });
+
+        const listEmbed = new EmbedBuilder()
+            .setColor('#F1C40F')
+            .setTitle(`Storico Warn di ${target.user.username}`)
+            .setDescription(list)
+            .setTimestamp();
+
+        message.channel.send({ embeds: [listEmbed] });
+    }
+
+    // --- COMANDO !unwarn @utente ---
+    if (command === 'unwarn') {
+        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return sendErrorEmbed("Non hai i permessi per rimuovere gli ammonimenti.");
+        const target = message.mentions.members.first();
+        if (!target) return sendErrorEmbed(`Uso corretto: \`${config.prefix}unwarn @utente\``);
+
+        db.ensure(target.id, []);
+        const userWarns = db.get(target.id);
+
+        if (userWarns.length === 0) return sendErrorEmbed("Questo utente non possiede alcun warn da rimuovere.");
+
+        userWarns.pop();
+        db.set(target.id, userWarns);
+
+        const unwarnEmbed = new EmbedBuilder()
+            .setColor('#2ECC71')
+            .setDescription(`✅ Rimosso con successo l'ultimo warn a **${target.user.tag}**. Warn rimanenti: \`${userWarns.length}\`.`);
+        
+        message.channel.send({ embeds: [unwarnEmbed] });
+    }
+
+    // --- COMANDO !unban ID_UTENTE ---
+    if (command === 'unban') {
+        if (!message.member.permissions.has(PermissionFlagsBits.BanMembers)) return sendErrorEmbed("Non hai i permessi per sbannare utenti.");
+        const targetId = args[0];
+        if (!targetId || isNaN(targetId)) return sendErrorEmbed(`Uso corretto: \`${config.prefix}unban ID_UTENTE\``);
+
+        try {
+            await message.guild.members.unban(targetId);
+            const unbanEmbed = new EmbedBuilder()
+                .setColor('#2ECC71')
+                .setTitle('🔓 Utente Sbannato')
+                .setDescription(`L'utente con ID \`${targetId}\` è stato rimosso dalla lista dei ban da ${message.author}.`)
+                .setTimestamp();
+            message.channel.send({ embeds: [unbanEmbed] });
+        } catch (error) {
+            sendErrorEmbed("Impossibile trovare questo ID nella lista dei ban del server o ID non valido.");
+        }
+    }
 
     // --- COMANDO !kick @utente [motivo] ---
     if (command === 'kick') {
         if (!message.member.permissions.has(PermissionFlagsBits.KickMembers)) return sendErrorEmbed("Non hai i permessi per cacciare utenti.");
         const target = message.mentions.members.first();
         if (!target) return sendErrorEmbed(`Uso corretto: \`${config.prefix}kick @utente [motivo]\``);
-        const reason = args.join(" ") || "Nessun motivo specificato";
+        const reason = args.slice(1).join(" ") || "Nessun motivo specificato";
         
         await target.kick(reason);
 
@@ -122,7 +220,7 @@ client.on('messageCreate', async (message) => {
         if (!message.member.permissions.has(PermissionFlagsBits.BanMembers)) return sendErrorEmbed("Non hai i permessi per bannare utenti.");
         const target = message.mentions.members.first();
         if (!target) return sendErrorEmbed(`Uso corretto: \`${config.prefix}ban @utente [motivo]\``);
-        const reason = args.join(" ") || "Nessun motivo specificato";
+        const reason = args.slice(1).join(" ") || "Nessun motivo specificato";
         
         await target.ban({ reason });
 
@@ -143,7 +241,7 @@ client.on('messageCreate', async (message) => {
     if (command === 'mute') {
         if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return sendErrorEmbed("Non hai i permessi per isolare utenti.");
         const target = message.mentions.members.first();
-        const duration = parseInt(args);
+        const duration = parseInt(args[1]);
         if (!target || isNaN(duration)) return sendErrorEmbed(`Uso corretto: \`${config.prefix}mute @utente [minuti]\``);
         
         await target.timeout(duration * 60 * 1000);
@@ -179,7 +277,7 @@ client.on('messageCreate', async (message) => {
     // --- COMANDO !clear [1-100] ---
     if (command === 'clear') {
         if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return sendErrorEmbed("Non hai i permessi per cancellare messaggi.");
-        const amount = parseInt(args);
+        const amount = parseInt(args[0]);
         if (isNaN(amount) || amount < 1 || amount > 100) return sendErrorEmbed(`Uso corretto: \`${config.prefix}clear [1-100]\``);
         
         await message.channel.bulkDelete(amount, true);
@@ -194,4 +292,3 @@ client.on('messageCreate', async (message) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
-
