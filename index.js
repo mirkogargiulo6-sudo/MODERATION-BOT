@@ -1,5 +1,17 @@
+
 const { Client, GatewayIntentBits, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const config = require('./config.json');
+const http = require('http');
+
+// --- MINI SERVER WEB PER EVITARE L'ERRORE DI RENDER ---
+const port = process.env.PORT || 3000;
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Bot online!');
+}).listen(port, () => {
+    console.log(`Server web finto attivo sulla porta ${port}`);
+});
+// ----------------------------------------------------
 
 const client = new Client({
     intents: [
@@ -142,7 +154,7 @@ client.on('messageCreate', async (message) => {
             .setTitle('🤐 Utente In Muto')
             .addFields(
                 { name: 'Utente', value: `${target.user.tag}`, inline: true },
-                { name: 'Durata', value: `${duration} minuti`, inline: true },
+                { name: 'Durata', value: `${duration} minutes`, inline: true },
                 { name: 'Moderatore', value: `${message.author.tag}` }
             )
             .setTimestamp();
@@ -183,5 +195,3 @@ client.on('messageCreate', async (message) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
-
-
