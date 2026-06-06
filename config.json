@@ -1,0 +1,6 @@
+{
+  "prefix": "?",
+  "botName": "Moderation Bot",
+  "botAvatar": "https://imgur.com",
+  "badWords": ["insulto1", "insulto2", "scamlink.com"]
+}
