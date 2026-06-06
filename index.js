@@ -1,4 +1,3 @@
-
 const { Client, GatewayIntentBits, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const config = require('./config.json');
 const http = require('http');
@@ -100,7 +99,7 @@ client.on('messageCreate', async (message) => {
     if (command === 'kick') {
         if (!message.member.permissions.has(PermissionFlagsBits.KickMembers)) return sendErrorEmbed("Non hai i permessi per cacciare utenti.");
         const target = message.mentions.members.first();
-        if (!target) return sendErrorEmbed("Menziona un utente valido da espellere.");
+        if (!target) return sendErrorEmbed(`Uso corretto: \`${config.prefix}kick @utente [motivo]\``);
         const reason = args.join(" ") || "Nessun motivo specificato";
         
         await target.kick(reason);
@@ -122,7 +121,7 @@ client.on('messageCreate', async (message) => {
     if (command === 'ban') {
         if (!message.member.permissions.has(PermissionFlagsBits.BanMembers)) return sendErrorEmbed("Non hai i permessi per bannare utenti.");
         const target = message.mentions.members.first();
-        if (!target) return sendErrorEmbed("Menziona un utente valido da bannare.");
+        if (!target) return sendErrorEmbed(`Uso corretto: \`${config.prefix}ban @utente [motivo]\``);
         const reason = args.join(" ") || "Nessun motivo specificato";
         
         await target.ban({ reason });
@@ -145,7 +144,7 @@ client.on('messageCreate', async (message) => {
         if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return sendErrorEmbed("Non hai i permessi per isolare utenti.");
         const target = message.mentions.members.first();
         const duration = parseInt(args);
-        if (!target || isNaN(duration)) return sendErrorEmbed("Uso corretto: `!mute @utente [minuti]`");
+        if (!target || isNaN(duration)) return sendErrorEmbed(`Uso corretto: \`${config.prefix}mute @utente [minuti]\``);
         
         await target.timeout(duration * 60 * 1000);
 
@@ -154,7 +153,7 @@ client.on('messageCreate', async (message) => {
             .setTitle('🤐 Utente In Muto')
             .addFields(
                 { name: 'Utente', value: `${target.user.tag}`, inline: true },
-                { name: 'Durata', value: `${duration} minutes`, inline: true },
+                { name: 'Durata', value: `${duration} minuti`, inline: true },
                 { name: 'Moderatore', value: `${message.author.tag}` }
             )
             .setTimestamp();
@@ -166,7 +165,7 @@ client.on('messageCreate', async (message) => {
     if (command === 'unmute') {
         if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return sendErrorEmbed("Non hai i permessi per togliere il muto.");
         const target = message.mentions.members.first();
-        if (!target) return sendErrorEmbed("Menziona un utente a cui togliere il muto.");
+        if (!target) return sendErrorEmbed(`Uso corretto: \`${config.prefix}unmute @utente\``);
         
         await target.timeout(null);
 
@@ -181,7 +180,7 @@ client.on('messageCreate', async (message) => {
     if (command === 'clear') {
         if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return sendErrorEmbed("Non hai i permessi per cancellare messaggi.");
         const amount = parseInt(args);
-        if (isNaN(amount) || amount < 1 || amount > 100) return sendErrorEmbed("Inserisci un numero da 1 a 100 messaggi da eliminare.");
+        if (isNaN(amount) || amount < 1 || amount > 100) return sendErrorEmbed(`Uso corretto: \`${config.prefix}clear [1-100]\``);
         
         await message.channel.bulkDelete(amount, true);
 
@@ -195,3 +194,4 @@ client.on('messageCreate', async (message) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
