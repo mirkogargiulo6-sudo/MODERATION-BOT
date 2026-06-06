@@ -265,9 +265,16 @@ client.on('messageCreate', async (message) => {
     if (command === 'mute') {
         if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return sendErrorEmbed("Non hai i permessi per isolare utenti.");
         const target = message.mentions.members.first();
-        const duration = parseInt(args[0]); 
+        if (!target) return sendErrorEmbed(`Uso corretto: \`${config.prefix}mute @utente [minuti]\``);
         
-        if (!target || isNaN(duration)) return sendErrorEmbed(`Uso corretto: \`${config.prefix}mute @utente [minuti]\``);
+        // SISTEMA DI PULIZIA INTELLIGENTE DELL'INPUT DI TEMPO
+        const timeInput = args.slice(1).join(" ");
+        if (!timeInput) return sendErrorEmbed(`Specifica il tempo del muto. Uso: \`${config.prefix}mute @utente 5m\``);
+        
+        // Estrae solo le cifre numeriche dal testo (cancella m, min, parentesi, ecc.)
+        const duration = parseInt(timeInput.replace(/\D/g, "")); 
+        
+        if (isNaN(duration) || duration <= 0) return sendErrorEmbed(`Inserisci un tempo numerico valido. Uso corretto: \`${config.prefix}mute @utente 5m\``);
         
         try {
             await target.timeout(duration * 60 * 1000);
@@ -321,3 +328,4 @@ client.on('messageCreate', async (message) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
