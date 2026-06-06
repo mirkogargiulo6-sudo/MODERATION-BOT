@@ -13,7 +13,6 @@ const client = new Client({
 client.once('ready', async () => {
     console.log(`${client.user.tag} è online e pronto a moderare!`);
     
-    // Cambia automaticamente Nome e Foto all'avvio usando il config.json
     try {
         if (client.user.username !== config.botName) {
             await client.user.setUsername(config.botName);
@@ -53,11 +52,37 @@ client.on('messageCreate', async (message) => {
     const args = message.content.slice(config.prefix.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    // Funzione rapida per mandare gli errori in rosso
     const sendErrorEmbed = (text) => {
         const errEmbed = new EmbedBuilder().setColor('#FF3333').setDescription(`❌ ${text}`);
         return message.reply({ embeds: [errEmbed] });
     };
+
+    // --- COMANDO !help ---
+    if (command === 'help') {
+        const helpEmbed = new EmbedBuilder()
+            .setColor('#3498DB')
+            .setTitle('📚 Lista Comandi - Moderation Bot')
+            .setDescription(`Ecco l'elenco dei comandi disponibili nel server. Il prefisso attuale è \`${config.prefix}\`.`)
+            .addFields(
+                { name: '🛡️ Moderazione (Solo Staff)', value: 
+                  `\`${config.prefix}kick @utente [motivo]\` - Espelle un membro dal server.\n` +
+                  `\`${config.prefix}ban @utente [motivo]\` - Banna permanentemente un membro.\n` +
+                  `\`${config.prefix}mute @utente [minuti]\` - Isola temporalmente un utente.\n` +
+                  `\`${config.prefix}unmute @utente\` - Rimuove l'isolamento a un utente.\n` +
+                  `\`${config.prefix}clear [1-100]\` - Cancella un numero specifico di messaggi.` 
+                },
+                { name: '⚙️ Automazione', value: 
+                  `**AutoMod**: Il bot monitora i messaggi ed elimina all'istante le parole bloccate configurate nel file \`config.json\`.` 
+                },
+                { name: 'ℹ️ Utilità', value: 
+                  `\`${config.prefix}help\` - Mostra questa schermata informativa.` 
+                }
+            )
+            .setFooter({ text: `${config.botName}`, iconURL: client.user.displayAvatarURL() })
+            .setTimestamp();
+
+        return message.channel.send({ embeds: [helpEmbed] });
+    }
 
     // --- COMANDO !kick @utente [motivo] ---
     if (command === 'kick') {
@@ -107,7 +132,7 @@ client.on('messageCreate', async (message) => {
     if (command === 'mute') {
         if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return sendErrorEmbed("Non hai i permessi per isolare utenti.");
         const target = message.mentions.members.first();
-        const duration = parseInt(args[0]);
+        const duration = parseInt(args);
         if (!target || isNaN(duration)) return sendErrorEmbed("Uso corretto: `!mute @utente [minuti]`");
         
         await target.timeout(duration * 60 * 1000);
@@ -143,7 +168,7 @@ client.on('messageCreate', async (message) => {
     // --- COMANDO !clear [1-100] ---
     if (command === 'clear') {
         if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return sendErrorEmbed("Non hai i permessi per cancellare messaggi.");
-        const amount = parseInt(args[0]);
+        const amount = parseInt(args);
         if (isNaN(amount) || amount < 1 || amount > 100) return sendErrorEmbed("Inserisci un numero da 1 a 100 messaggi da eliminare.");
         
         await message.channel.bulkDelete(amount, true);
@@ -157,5 +182,6 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// Legge il Token inserito nelle impostazioni segrete di Render
 client.login(process.env.DISCORD_TOKEN);
+
+
